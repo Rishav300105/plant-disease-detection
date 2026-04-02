@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>PlantGuard — Disease Detection</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<style>
+/* ── Reset & base ──────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --cream    : #f7f4ef;
+  --paper    : #fefcf8;
+  --ink      : #1a1f18;
+  --ink2     : #3a4238;
+  --muted    : #8a9688;
+  --border   : #ddd8ce;
+  --green    : #2d6a35;
+  --green-lt : #e8f2e9;
+  --green-md : #4a9955;
+  --red      : #c0392b;
+  --red-lt   : #fdf0ee;
+  --amber    : #b8620a;
+  --amber-lt : #fdf5e8;
+  --purple   : #6b3fa0;
+  --purple-lt: #f3eefb;
+  --r        : 14px;
+}
+
+html { font-size: 16px; }
+
+body {
+  font-family: 'Outfit', sans-serif;
+  background: var(--cream);
+  color: var(--ink);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Decorative background ─────────────────────────────────── */
+body::before {
+  content: '';
+  position: fixed; inset: 0; z-index: 0;
+  background:
+    radial-gradient(ellipse 70% 50% at 95% 5%, #d4e8d466 0%, transparent 55%),
+    radial-gradient(ellipse 50% 40% at 5% 95%, #e8f0d866 0%, transparent 50%);
+  pointer-events: none;
+}
+
+/* ── Header ────────────────────────────────────────────────── */
+header {
+  position: relative; z-index: 1;
+  padding: 2rem 2rem 1.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border);
+  background: var(--paper);
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.brand-leaf {
+  width: 36px; height: 36px;
+  position: relative;
+}
+.brand-leaf svg { width: 100%; height: 100%; }
+.brand-name {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--ink);
+  letter-spacing: -0.5px;
+}
+.brand-name span { color: var(--green); }
+.brand-tag {
+  font-size: 0.72rem;
+  font-weight: 400;
+  color: var(--muted);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-top: 1px;
+}
+.header-badge {
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: var(--green);
+  background: var(--green-lt);
+  border: 1px solid #b8d9bc;
+  padding: 4px 12px;
+  border-radius: 999px;
+  letter-spacing: 0.04em;
+}
+
+/* ── Main layout ───────────────────────────────────────────── */
+main {
+  position: relative; z-index: 1;
+  flex: 1;
+  max-width: 860px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 2.5rem 1.5rem 4rem;
+}
+
+/* ── Two-panel layout ──────────────────────────────────────── */
+.panel-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  align-items: start;
+}
+@media (max-width: 640px) {
+  .panel-row { grid-template-columns: 1fr; }
+}
+
+/* ── Upload panel ──────────────────────────────────────────── */
+.upload-panel {
+  background: var(--paper);
+  border: 1.5px solid var(--border);
+  border-radius: var(--r);
+  overflow: hidden;
+}
+.panel-header {
+  padding: 1rem 1.4rem 0.8rem;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.panel-num {
+  width: 22px; height: 22px;
+  background: var(--ink);
+  color: var(--paper);
+  border-radius: 50%;
+  font-size: 0.7rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.panel-title {
+  font-size: 0.8rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--ink2);
+}
+
+.drop-zone {
+  position: relative;
+  margin: 1.2rem;
+  border: 2px dashed var(--border);
+  border-radius: 10px;
+  padding: 2rem 1rem;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color .2s, background .2s;
+  background: var(--cream);
+}
+.drop-zone:hover, .drop-zone.over {
+  border-color: var(--green);
+  background: var(--green-lt);
+}
+.drop-zone input {
+  position: absolute; inset: 0;
+  opacity: 0; cursor: pointer;
+  width: 100%; height: 100%;
+}
+.drop-icon { font-size: 2.2rem; margin-bottom: 0.6rem; display: block; }
+.drop-txt { font-size: 0.85rem; color: var(--muted); line-height: 1.5; }
+.drop-txt strong { color: var(--green); font-weight: 600; }
+
+/* Leaf preview (replaces drop zone content) */
+.leaf-preview-wrap {
+  margin: 1.2rem;
+  border-radius: 10px;
+  overflow: hidden;
+  display: none;
+  position: relative;
+  border: 2px solid var(--border);
+}
+.leaf-preview-wrap img {
+  width: 100%;
+  height: 200px;
+  object-fit: cover;
+  display: block;
+}
+.leaf-preview-name {
+  padding: 0.5rem 0.8rem;
+  font-size: 0.75rem;
+  color: var(--muted);
+  background: var(--paper);
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.leaf-preview-name .dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--green);
+  flex-shrink: 0;
+}
+.change-btn {
+  margin-left: auto;
+  font-size: 0.72rem;
+  color: var(--green);
+  cursor: pointer;
+  font-weight: 500;
+  text-decoration: underline;
+}
+
+.btn-scan {
+  display: block;
+  width: calc(100% - 2.4rem);
+  margin: 0 1.2rem 1.2rem;
+  padding: 0.8rem;
+  background: var(--green);
+  color: #fff;
+  font-family: 'Outfit', sans-serif;
+  font-size: 0.9rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  border: none;
+  border-radius: 9px;
+  cursor: pointer;
+  transition: background .2s, transform .15s, box-shadow .2s;
+  box-shadow: 0 2px 12px #2d6a3540;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.btn-scan:hover { background: #235429; transform: translateY(-1px); box-shadow: 0 4px 18px #2d6a3555; }
+.btn-scan:active { transform: translateY(0); }
+.btn-scan.loading { background: var(--border); color: var(--muted); pointer-events: none; }
+.spinner {
+  width: 14px; height: 14px;
+  border: 2px solid #ffffff44;
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin .6s linear infinite;
+  display: none;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.btn-scan.loading .spinner { display: block; }
+.btn-scan.loading .scan-icon { display: none; }
+
+/* ── Result panel ──────────────────────────────────────────── */
+.result-panel {
+  background: var(--paper);
+  border: 1.5px solid var(--border);
+  border-radius: var(--r);
+  overflow: hidden;
+}
+
+/* Empty state */
+.result-empty {
+  padding: 3rem 1.5rem;
+  text-align: center;
+}
+.result-empty-icon { font-size: 2.5rem; opacity: 0.25; margin-bottom: 0.8rem; }
+.result-empty p { color: var(--muted); font-size: 0.85rem; line-height: 1.6; }
+
+/* Scanning state */
+.result-scanning {
+  padding: 3rem 1.5rem;
+  text-align: center;
+  display: none;
+}
+.scan-ring {
+  width: 60px; height: 60px;
+  border: 3px solid var(--green-lt);
+  border-top-color: var(--green);
+  border-radius: 50%;
+  animation: spin .8s linear infinite;
+  margin: 0 auto 1rem;
+}
+.result-scanning p { color: var(--muted); font-size: 0.85rem; }
+
+/* Result content */
+.result-content { display: none; }
+
+/* Status bar at top of result */
+.status-bar {
+  padding: 0.9rem 1.4rem;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px solid var(--border);
+}
+.status-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.status-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.status-bar.healthy .status-dot { background: var(--green-md); box-shadow: 0 0 8px #4a995566; }
+.status-bar.healthy .status-label { color: var(--green); }
+.status-bar.diseased .status-dot { background: var(--red); box-shadow: 0 0 8px #c0392b66; }
+.status-bar.diseased .status-label { color: var(--red); }
+.status-bar.moderate .status-dot { background: var(--amber); box-shadow: 0 0 8px #b8620a66; }
+.status-bar.moderate .status-label { color: var(--amber); }
+.status-bar.critical .status-dot { background: var(--purple); box-shadow: 0 0 8px #6b3fa066; }
+.status-bar.critical .status-label { color: var(--purple); }
+
+/* Leaf thumbnail row */
+.result-leaf-row {
+  padding: 1.2rem 1.4rem 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+}
+.result-thumb {
+  width: 68px; height: 68px;
+  border-radius: 8px;
+  object-fit: cover;
+  border: 2px solid var(--border);
+  flex-shrink: 0;
+  display: none;
+}
+.result-main { flex: 1; }
+.result-disease {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--ink);
+  line-height: 1.25;
+  letter-spacing: -0.3px;
+}
+.result-class {
+  font-size: 0.73rem;
+  color: var(--muted);
+  margin-top: 3px;
+  font-weight: 300;
+}
+
+/* Confidence meter */
+.conf-section {
+  padding: 1rem 1.4rem 0;
+}
+.conf-label-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 6px;
+}
+.conf-label {
+  font-size: 0.72rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--muted);
+}
+.conf-value {
+  font-size: 1.6rem;
+  font-family: 'Playfair Display', serif;
+  font-weight: 700;
+  color: var(--ink);
+  line-height: 1;
+}
+.conf-value span {
+  font-size: 0.85rem;
+  font-family: 'Outfit', sans-serif;
+  font-weight: 400;
+  color: var(--muted);
+}
+.conf-track {
+  height: 8px;
+  background: var(--cream);
+  border-radius: 999px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+.conf-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--green);
+  width: 0%;
+  transition: width 1.1s cubic-bezier(.22,1,.36,1);
+}
+
+/* Quick tip */
+.quick-tip {
+  margin: 1rem 1.4rem;
+  padding: 0.8rem 1rem;
+  border-radius: 9px;
+  font-size: 0.82rem;
+  line-height: 1.55;
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+.quick-tip .tip-icon { font-size: 0.95rem; flex-shrink: 0; margin-top: 1px; }
+.quick-tip.healthy  { background: var(--green-lt);  color: #1f5c28;  border: 1px solid #b8d9bc; }
+.quick-tip.moderate { background: var(--amber-lt);  color: #7a4108;  border: 1px solid #f0c890; }
+.quick-tip.diseased { background: var(--red-lt);    color: #8b2218;  border: 1px solid #f0c4bf; }
+.quick-tip.critical { background: var(--purple-lt); color: #4a2470;  border: 1px solid #d4b8f0; }
+
+/* Other predictions mini row */
+.others-section {
+  padding: 0 1.4rem 1.4rem;
+}
+.others-label {
+  font-size: 0.68rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+.others-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.other-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.77rem;
+}
+.other-name { color: var(--ink2); flex: 1; }
+.other-bar-bg {
+  width: 60px; height: 4px;
+  background: var(--cream);
+  border-radius: 999px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+.other-bar-fill { height: 100%; background: var(--border); border-radius: 999px; }
+.other-pct { font-size: 0.7rem; color: var(--muted); min-width: 32px; text-align: right; }
+
+/* ── Error / warning ───────────────────────────────────────── */
+.alert {
+  padding: 0.8rem 1.1rem;
+  border-radius: 9px;
+  font-size: 0.83rem;
+  margin-bottom: 1.4rem;
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+.alert-warn  { background: #fff8e6; border: 1px solid #f0c890; color: #7a4108; }
+.alert-error { background: #fdf0ee; border: 1px solid #f0c4bf; color: #8b2218; }
+
+/* ── Footer ────────────────────────────────────────────────── */
+footer {
+  position: relative; z-index: 1;
+  text-align: center;
+  padding: 1.5rem;
+  border-top: 1px solid var(--border);
+  background: var(--paper);
+  font-size: 0.73rem;
+  color: var(--muted);
+  letter-spacing: 0.02em;
+}
+</style>
+</head>
+<body>
+
+  <header>
+
+    <div class="brand">
+      <h2>🌿 PlantGuard</h2>
+    </div>
+  
+    <!-- 🌍 LANGUAGE SELECTOR -->
+    <form method="GET">
+      <select name="lang" onchange="this.form.submit()"
+        style="padding:6px 10px; border-radius:8px; border:1px solid #ccc;">
+        
+        <option value="en" {% if lang=='en' %}selected{% endif %}>English</option>
+        <option value="hi" {% if lang=='hi' %}selected{% endif %}>हिंदी</option>
+      
+      </select>
+    </form>
+  
+    <div class="header-badge">CNN</div>
+  
+  </header>
+
+<main>
+
+  {% if warning %}
+  <div class="alert alert-warn">⚠️ <span>{{ warning }}</span></div>
+  {% endif %}
+  {% if error %}
+  <div class="alert alert-error">❌ <span>{{ error }}</span></div>
+  {% endif %}
+
+  <div class="panel-row">
+
+    <!-- ── Upload panel ─────────────────────────────────── -->
+    <div class="upload-panel">
+      <div class="panel-header">
+        <div class="panel-num">1</div>
+        <span class="panel-title">{{ t.upload }}</span>
+      </div>
+
+      <form method="POST" enctype="multipart/form-data" id="upload-form">
+
+        <div class="drop-zone" id="drop-zone">
+          <input type="file" name="image" id="file-input" accept="image/*" required/>
+          <span class="drop-icon">🌿</span>
+          <div class="drop-txt">
+            <strong>{{ t.click_upload }}</strong> {{ t.or_drag }}<br/>
+            {{ t.clear_photo }}
+          </div>
+        </div>
+
+        <div class="leaf-preview-wrap" id="preview-wrap">
+          <img id="preview-img" src="" alt="Leaf preview"/>
+          <div class="leaf-preview-name">
+            <span class="dot"></span>
+            <span id="preview-name">—</span>
+            <span class="change-btn" id="change-btn">Change</span>
+          </div>
+        </div>
+
+        <button type="submit" class="btn-scan" id="scan-btn">
+          <span class="scan-icon">🔬</span>
+          <span class="spinner"></span>
+          <span id="scan-label">{{ t.scan }}</span>
+        </button>
+
+      </form>
+    </div>
+
+    <!-- ── Result panel ──────────────────────────────────── -->
+    <div class="result-panel" id="result-panel">
+      <div class="panel-header">
+        <div class="panel-num">2</div>
+        <span class="panel-title">{{ t.diagnosis }}</span>
+      </div>
+
+      <!-- Empty state -->
+      <div class="result-empty" id="result-empty">
+        <div class="result-empty-icon">🔎</div>
+        <p>{{ t.upload }}<br/>{{ t.diagnosis }}</p>
+      </div>
+
+      <!-- Scanning state -->
+      <div class="result-scanning" id="result-scanning">
+        <div class="scan-ring"></div>
+        <p>Analysing leaf…</p>
+      </div>
+
+      <!-- Result (populated by JS or Jinja on page-load POST) -->
+      <div class="result-content" id="result-content"
+           {% if predictions %}style="display:block"{% endif %}>
+
+        {% if predictions %}
+        {% set p = predictions[0] %}
+        {% set cls = 'healthy' if p.severity == 'None' else
+                     ('moderate' if p.severity == 'Moderate' else
+                     ('critical' if p.severity == 'Critical' else 'diseased')) %}
+
+        <div class="status-bar {{ cls }}" id="status-bar">
+          <div class="status-dot"></div>
+          <span class="status-label">
+            {% if p.severity == 'None' %}Healthy Plant
+            {% elif p.severity == 'Moderate' %}{{ t.moderate }}
+            {% elif p.severity == 'Critical' %}Critical — Act Now
+            {% else %}{{ t.disease_detected }}{% endif %}
+          </span>
+        </div>
+
+        <div class="result-leaf-row">
+          <img class="result-thumb" id="result-thumb" src="" alt=""/>
+          <div class="result-main">
+            <div class="result-disease">
+              {% if "healthy" in p.label.lower() %}
+                {{ t.healthy }}
+              {% else %}
+                {{ t.diseased_label }}
+              {% endif %}
+            </div>
+            <div class="result-class" id="result-class">{{ p.class_name }}</div>
+          </div>
+        </div>
+
+        <div class="conf-section">
+          <div class="conf-label-row">
+            <span class="conf-label">{{ t.confidence }}</span>
+            <span class="conf-value" id="conf-num">{{ p.confidence }}<span>%</span></span>
+          </div>
+          <div class="conf-track">
+            <div class="conf-fill" id="conf-fill" style="width:{{ p.confidence }}%;
+              background: {{ '#2d6a35' if p.severity=='None' else
+                             ('#b8620a' if p.severity=='Moderate' else
+                             ('#6b3fa0' if p.severity=='Critical' else '#c0392b')) }}">
+            </div>
+          </div>
+        </div>
+
+        <div class="quick-tip {{ cls }}" id="quick-tip">
+          <span class="tip-icon">
+            {% if p.severity == 'None' %}✅{% elif p.severity == 'Critical' %}🚨{% else %}💊{% endif %}
+          <span id="tip-text">
+  {% if p.severity == 'None' %}
+    {{ p.prevention }}
+  {% else %}
+    {{ t.disease_detected }}
+  {% endif %}
+</span>
+        </div>
+
+        {% if predictions|length > 1 %}
+        <div class="others-section">
+          <div class="others-label">Other possibilities</div>
+          <div class="others-row" id="others-row">
+            {% for p2 in predictions[1:] %}
+            <div class="other-item">
+              <span class="other-name">{{ p2.label }}</span>
+              <div class="other-bar-bg">
+                <div class="other-bar-fill" style="width:{{ p2.confidence }}%"></div>
+              </div>
+              <span class="other-pct">{{ p2.confidence }}%</span>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
+
+        {% endif %}
+      </div><!-- /result-content -->
+
+    </div><!-- /result-panel -->
+  </div><!-- /panel-row -->
+
+</main>
+
+<footer>
+  PlantGuard is for informational purposes only — always consult a qualified agronomist for critical decisions.
+</footer>
+
+<script>
+const dropZone   = document.getElementById('drop-zone');
+const fileInput  = document.getElementById('file-input');
+const prevWrap   = document.getElementById('preview-wrap');
+const prevImg    = document.getElementById('preview-img');
+const prevName   = document.getElementById('preview-name');
+const changeBtn  = document.getElementById('change-btn');
+const scanBtn    = document.getElementById('scan-btn');
+const scanLabel  = document.getElementById('scan-label');
+const form       = document.getElementById('upload-form');
+
+const emptyEl    = document.getElementById('result-empty');
+const scanningEl = document.getElementById('result-scanning');
+const contentEl  = document.getElementById('result-content');
+
+let currentDataURL = null;
+
+// ── Drag & drop ─────────────────────────────────────────────
+['dragover','dragenter'].forEach(e =>
+  dropZone.addEventListener(e, ev => { ev.preventDefault(); dropZone.classList.add('over'); }));
+['dragleave','drop'].forEach(e =>
+  dropZone.addEventListener(e, ev => { ev.preventDefault(); dropZone.classList.remove('over'); }));
+dropZone.addEventListener('drop', ev => {
+  if (ev.dataTransfer.files[0]) {
+    fileInput.files = ev.dataTransfer.files;
+    showPreview(ev.dataTransfer.files[0]);
+  }
+});
+fileInput.addEventListener('change', () => {
+  if (fileInput.files[0]) showPreview(fileInput.files[0]);
+});
+changeBtn.addEventListener('click', () => {
+  prevWrap.style.display  = 'none';
+  dropZone.style.display  = 'block';
+  fileInput.value = '';
+  currentDataURL  = null;
+});
+
+function showPreview(file) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    currentDataURL       = e.target.result;
+    prevImg.src          = currentDataURL;
+    prevName.textContent = file.name;
+    prevWrap.style.display = 'block';
+    dropZone.style.display = 'none';
+  };
+  reader.readAsDataURL(file);
+}
+
+// ── Submit ───────────────────────────────────────────────────
+form.addEventListener('submit', () => {
+  scanBtn.classList.add('loading');
+  scanLabel.textContent = 'Analysing…';
+  emptyEl.style.display    = 'none';
+  contentEl.style.display  = 'none';
+  scanningEl.style.display = 'block';
+  // Standard form POST — page reloads with results
+});
+
+// ── On page load: if results present, show thumb + animate bar ──
+window.addEventListener('DOMContentLoaded', () => {
+  const fill  = document.getElementById('conf-fill');
+  const thumb = document.getElementById('result-thumb');
+
+  if (fill) {
+    // Animate bar
+    const w = fill.style.width;
+    fill.style.width = '0%';
+    requestAnimationFrame(() => requestAnimationFrame(() => fill.style.width = w));
+  }
+
+  if (thumb) {
+    // Try to restore preview image from sessionStorage
+    const stored = sessionStorage.getItem('lastLeaf');
+    if (stored) {
+      thumb.src           = stored;
+      thumb.style.display = 'block';
+    }
+  }
+});
+
+// Store uploaded image in sessionStorage so result thumb can show it
+form.addEventListener('submit', () => {
+  if (currentDataURL) sessionStorage.setItem('lastLeaf', currentDataURL);
+});
+</script>
+</body>
+</html>
