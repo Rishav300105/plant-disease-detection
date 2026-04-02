@@ -66,12 +66,6 @@ It will be downloaded automatically when you run the project.
 
 ---
 
-## 📸 Demo
-
-(Add your project screenshot here)
-
----
-
 ## 🌍 Future Improvements
 
 * 🔥 Better UI design
