@@ -5,8 +5,15 @@ from PIL import Image
 import json
 
 app = Flask(__name__)
-
 # Load model
+import gdown
+import os
+
+if not os.path.exists("model/plant_model.h5"):
+    url = "YOUR_DRIVE_LINKhttps://drive.google.com/file/d/1ZMu-Ha3KPV_Fb_KtJ2VsSlkffFyeANWW/view?usp=sharing"
+    output = "model/plant_model.h5"
+    gdown.download(url, output, quiet=False)
+
 model = tf.keras.models.load_model("model/plant_model.h5")
 
 # Load class labels
