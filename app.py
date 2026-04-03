@@ -39,6 +39,7 @@ translations = {
         "click_upload": "Click to upload",
         "or_drag": "or drag & drop",
         "clear_photo": "a clear photo of the leaf",
+        "advice": "Keep plant in good condition"
     },
     "hi": {
         "upload": "पत्ता अपलोड करें",
@@ -51,6 +52,7 @@ translations = {
         "click_upload": "अपलोड करने के लिए क्लिक करें",
         "or_drag": "या ड्रैग और ड्रॉप करें",
         "clear_photo": "पत्ते की साफ तस्वीर अपलोड करें",
+        "advice": "पौधे को अच्छी स्थिति में रखें"
     }
 }
 
@@ -72,7 +74,7 @@ def predict_image(img):
 # 🟢 MAIN ROUTE
 @app.route('/', methods=['GET', 'POST'])
 def index():
-    lang = request.args.get("lang", "en")   # default English
+    lang = request.args.get("lang", "en")
     t = translations.get(lang, translations["en"])
 
     result = ""
@@ -88,16 +90,15 @@ def index():
 
         result, confidence = predict_image(img)
 
-        # Language-based suggestion
+        # ✅ FIXED (no hardcoding)
         if "healthy" in result.lower():
             suggestion = t["healthy"]
         else:
-            suggestion = t.get("diseased", "Disease detected")
+            suggestion = t["disease_detected"]
 
     prediction_data = []
 
     if result:
-        # Clean label
         clean_label = result.split("_", 1)[-1]
         clean_label = clean_label.replace("_", " ").capitalize()
 
@@ -106,7 +107,7 @@ def index():
             "confidence": confidence,
             "severity": "None" if "healthy" in result.lower() else "Moderate",
             "action": suggestion,
-            "prevention": "Keep plant in good condition",
+            "prevention": t["advice"],   # ✅ FIX HERE
             "color": "#2d6a35" if "healthy" in result.lower() else "#c0392b",
             "low_conf": confidence < 50
         }]
@@ -137,14 +138,15 @@ def predict():
     clean_label = clean_label.replace("_", " ").capitalize()
 
     if "healthy" in result.lower():
-        suggestion = t.get("healthy", "Plant is healthy")
+        suggestion = t["healthy"]
     else:
-        suggestion = t.get("diseased", "Disease detected")
+        suggestion = t["disease_detected"]
 
     return jsonify({
         "result": clean_label,
         "confidence": confidence,
-        "suggestion": suggestion
+        "suggestion": suggestion,
+        "prevention": t["advice"]   # ✅ FIX HERE ALSO
     })
 
 

@@ -511,7 +511,7 @@ footer {
       <form method="POST" enctype="multipart/form-data" id="upload-form">
 
         <div class="drop-zone" id="drop-zone">
-          <input type="file" name="image" id="file-input" accept="image/*" required/>
+          <input type="file" name="image" id="file-input" accept="image/*" capture="environment" required/>
           <span class="drop-icon">🌿</span>
           <div class="drop-txt">
             <strong>{{ t.click_upload }}</strong> {{ t.or_drag }}<br/>
@@ -566,10 +566,10 @@ footer {
                      ('moderate' if p.severity == 'Moderate' else
                      ('critical' if p.severity == 'Critical' else 'diseased')) %}
 
-        <div class="status-bar {{ cls }}" id="status-bar">
+         <div class="status-bar {{ cls }}" id="status-bar">
           <div class="status-dot"></div>
           <span class="status-label">
-            {% if p.severity == 'None' %}Healthy Plant
+            {% if p.severity == 'None' %}{{ t.healthy }}
             {% elif p.severity == 'Moderate' %}{{ t.moderate }}
             {% elif p.severity == 'Critical' %}Critical — Act Now
             {% else %}{{ t.disease_detected }}{% endif %}
