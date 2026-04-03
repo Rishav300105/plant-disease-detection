@@ -214,6 +214,25 @@ main {
   font-weight: 500;
   text-decoration: underline;
 }
+.btn-history {
+  display: block;
+  width: calc(100% - 2.4rem);
+  margin: 0 1.2rem 0.8rem;
+  padding: 0.7rem;
+  background: linear-gradient(135deg, #2d6a35, #40916c);
+  color: #fff;
+  text-align: center;
+  font-size: 0.85rem;
+  font-weight: 500;
+  border-radius: 8px;
+  text-decoration: none;
+  transition: 0.2s;
+}
+
+.btn-history:hover {
+  background: #1b4332;
+  transform: scale(1.03);
+}
 
 .btn-scan {
   display: block;
@@ -235,6 +254,11 @@ main {
   align-items: center;
   justify-content: center;
   gap: 8px;
+}
+.history-below {
+  display: flex;
+  justify-content: center;
+  margin-top: 15px;
 }
 .btn-scan:hover { background: #235429; transform: translateY(-1px); box-shadow: 0 4px 18px #2d6a3555; }
 .btn-scan:active { transform: translateY(0); }
@@ -474,19 +498,12 @@ footer {
     <div class="brand">
       <h2>🌿 PlantGuard</h2>
     </div>
+
   
-    <!-- 🌍 LANGUAGE SELECTOR -->
-    <form method="GET">
-      <select name="lang" onchange="this.form.submit()"
-        style="padding:6px 10px; border-radius:8px; border:1px solid #ccc;">
-        
-        <option value="en" {% if lang=='en' %}selected{% endif %}>English</option>
-        <option value="hi" {% if lang=='hi' %}selected{% endif %}>हिंदी</option>
-      
-      </select>
-    </form>
-  
-    <div class="header-badge">CNN</div>
+    <a href="/logout" style="padding:6px 12px; background:#c0392b; color:white; border-radius:6px; text-decoration:none;">
+      Logout
+      </a>
+
   
   </header>
 
@@ -505,7 +522,7 @@ footer {
     <div class="upload-panel">
       <div class="panel-header">
         <div class="panel-num">1</div>
-        <span class="panel-title">{{ t.upload }}</span>
+        <span class="panel-title">Upload Leaf</span>
       </div>
 
       <form method="POST" enctype="multipart/form-data" id="upload-form">
@@ -514,8 +531,8 @@ footer {
           <input type="file" name="image" id="file-input" accept="image/*" capture="environment" required/>
           <span class="drop-icon">🌿</span>
           <div class="drop-txt">
-            <strong>{{ t.click_upload }}</strong> {{ t.or_drag }}<br/>
-            {{ t.clear_photo }}
+            <strong>Click to upload</strong> or drag & drop<br/>
+            Clear photo
           </div>
         </div>
 
@@ -527,11 +544,10 @@ footer {
             <span class="change-btn" id="change-btn">Change</span>
           </div>
         </div>
-
         <button type="submit" class="btn-scan" id="scan-btn">
           <span class="scan-icon">🔬</span>
           <span class="spinner"></span>
-          <span id="scan-label">{{ t.scan }}</span>
+          <span id="scan-label">Scan Leaf</span>
         </button>
 
       </form>
@@ -541,13 +557,13 @@ footer {
     <div class="result-panel" id="result-panel">
       <div class="panel-header">
         <div class="panel-num">2</div>
-        <span class="panel-title">{{ t.diagnosis }}</span>
+        <span class="panel-title">Diagnosis</span>
       </div>
 
       <!-- Empty state -->
       <div class="result-empty" id="result-empty">
         <div class="result-empty-icon">🔎</div>
-        <p>{{ t.upload }}<br/>{{ t.diagnosis }}</p>
+        <p>Upload Leaf<br/>Diagnosis</p>
       </div>
 
       <!-- Scanning state -->
@@ -562,58 +578,51 @@ footer {
 
         {% if predictions %}
         {% set p = predictions[0] %}
-        {% set cls = 'healthy' if p.severity == 'None' else
-                     ('moderate' if p.severity == 'Moderate' else
-                     ('critical' if p.severity == 'Critical' else 'diseased')) %}
+        {% set cls = 'healthy' if p.label == 'Healthy' else 'diseased' %}
 
          <div class="status-bar {{ cls }}" id="status-bar">
           <div class="status-dot"></div>
           <span class="status-label">
-            {% if p.severity == 'None' %}{{ t.healthy }}
-            {% elif p.severity == 'Moderate' %}{{ t.moderate }}
-            {% elif p.severity == 'Critical' %}Critical — Act Now
-            {% else %}{{ t.disease_detected }}{% endif %}
+            {{ p.label }}
           </span>
         </div>
 
         <div class="result-leaf-row">
-          <img class="result-thumb" id="result-thumb" src="" alt=""/>
+
+          <img class="result-thumb" id="result-thumb"
+               src="{{ url_for('static', filename='uploads/' + p.image) }}"
+               style="display:block; border-radius:10px;"
+               alt="Leaf Image">
+        
           <div class="result-main">
-            <div class="result-disease">
-              {% if "healthy" in p.label.lower() %}
-                {{ t.healthy }}
-              {% else %}
-                {{ t.diseased_label }}
-              {% endif %}
+        
+            <div class="result-disease" style="font-size:28px; color:#2d6a35; font-weight:700;">
+              {{ p.label }}
             </div>
-            <div class="result-class" id="result-class">{{ p.class_name }}</div>
-          </div>
-        </div>
-
-        <div class="conf-section">
-          <div class="conf-label-row">
-            <span class="conf-label">{{ t.confidence }}</span>
-            <span class="conf-value" id="conf-num">{{ p.confidence }}<span>%</span></span>
-          </div>
-          <div class="conf-track">
-            <div class="conf-fill" id="conf-fill" style="width:{{ p.confidence }}%;
-              background: {{ '#2d6a35' if p.severity=='None' else
-                             ('#b8620a' if p.severity=='Moderate' else
-                             ('#6b3fa0' if p.severity=='Critical' else '#c0392b')) }}">
+        
+            <div class="conf-section">
+              <div class="conf-label-row">
+                <span class="conf-label">Confidence</span>
+                <span class="conf-value">{{ p.confidence }}<span>%</span></span>
+              </div>
+        
+              <div class="conf-track">
+                <div class="conf-fill"
+                     style="width:{{ p.confidence }}%;
+                     background: {{ '#2d6a35' if p.severity=='None' else
+                                    ('#b8620a' if p.severity=='Moderate' else
+                                    ('#6b3fa0' if p.severity=='Critical' else '#c0392b')) }}">
+                </div>
+              </div>
             </div>
+        
+            <div class="quick-tip {{ cls }}">
+              <span class="tip-icon">💊</span>
+              <span>{{ p.solution }}</span>
+            </div>
+        
           </div>
-        </div>
-
-        <div class="quick-tip {{ cls }}" id="quick-tip">
-          <span class="tip-icon">
-            {% if p.severity == 'None' %}✅{% elif p.severity == 'Critical' %}🚨{% else %}💊{% endif %}
-          <span id="tip-text">
-  {% if p.severity == 'None' %}
-    {{ p.prevention }}
-  {% else %}
-    {{ t.disease_detected }}
-  {% endif %}
-</span>
+        
         </div>
 
         {% if predictions|length > 1 %}
@@ -637,6 +646,9 @@ footer {
       </div><!-- /result-content -->
 
     </div><!-- /result-panel -->
+    <div class="history-below">
+      <a href="/history" class="btn-history">📊 View History</a>
+    </div>
   </div><!-- /panel-row -->
 
 </main>
@@ -718,13 +730,13 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 
   if (thumb) {
-    // Try to restore preview image from sessionStorage
-    const stored = sessionStorage.getItem('lastLeaf');
-    if (stored) {
-      thumb.src           = stored;
-      thumb.style.display = 'block';
-    }
+  const stored = sessionStorage.getItem('lastLeaf');
+
+  if (stored) {
+    thumb.src = stored;
+    thumb.style.display = 'block';
   }
+}
 });
 
 // Store uploaded image in sessionStorage so result thumb can show it

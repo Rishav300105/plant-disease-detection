@@ -1,63 +1,124 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, redirect
+from flask_sqlalchemy import SQLAlchemy
+from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image as RLImage
+from reportlab.lib.styles import getSampleStyleSheet
 import tensorflow as tf
 import numpy as np
 from PIL import Image
 import json
+import os
+import gdown
 
 app = Flask(__name__)
-# Load model
-import gdown
-import os
 
+# =========================
+# CONFIG
+# =========================
+app.config['SECRET_KEY'] = 'secret123'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///users.db'
+app.config['UPLOAD_FOLDER'] = 'static/uploads'
+
+db = SQLAlchemy(app)
+
+# =========================
+# LOGIN SETUP
+# =========================
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = "login"
+
+# =========================
+# MODELS
+# =========================
+class User(UserMixin, db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(100))
+    password = db.Column(db.String(100))
+
+
+class Prediction(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer)
+    label = db.Column(db.String(100))
+    confidence = db.Column(db.Float)
+    image = db.Column(db.String(200))
+
+
+@login_manager.user_loader
+def load_user(user_id):
+    return User.query.get(int(user_id))
+
+# =========================
+# AUTH ROUTES
+# =========================
+@app.route('/signup', methods=['GET', 'POST'])
+def signup():
+    if request.method == 'POST':
+        user = User(
+            username=request.form['username'],
+            password=request.form['password']
+        )
+        db.session.add(user)
+        db.session.commit()
+        return redirect('/login')
+    return render_template('signup.html')
+
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        user = User.query.filter_by(
+            username=request.form['username'],
+            password=request.form['password']
+        ).first()
+
+        if user:
+            login_user(user)
+            return redirect('/')
+
+    return render_template('login.html')
+
+
+@app.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    return redirect('/login')
+
+# =========================
+# LOAD MODEL
+# =========================
 if not os.path.exists("model/plant_model.h5"):
-    url = "YOUR_DRIVE_LINKhttps://drive.google.com/file/d/1ZMu-Ha3KPV_Fb_KtJ2VsSlkffFyeANWW/view?usp=sharing"
-    output = "model/plant_model.h5"
-    gdown.download(url, output, quiet=False)
+    url = "https://drive.google.com/uc?id=1ZMu-Ha3KPV_Fb_KtJ2VsSlkffFyeANWW"
+    gdown.download(url, "model/plant_model.h5", quiet=False)
 
 model = tf.keras.models.load_model("model/plant_model.h5")
 
-# Load class labels
+# =========================
+# CLASS LABELS
+# =========================
 with open("model/classes.json", "r") as f:
     class_indices = json.load(f)
 
-# Fix class order
 classes = [None] * len(class_indices)
 for key, value in class_indices.items():
     classes[value] = key
 
-
-# 🌍 LANGUAGE DICTIONARY
-translations = {
-    "en": {
-        "upload": "Upload Leaf",
-        "scan": "Scan Leaf",
-        "diagnosis": "Diagnosis",
-        "confidence": "Confidence",
-        "healthy": "Healthy Plant",
-        "diseased_label": "Diseased",
-        "disease_detected": "Disease Detected",
-        "click_upload": "Click to upload",
-        "or_drag": "or drag & drop",
-        "clear_photo": "a clear photo of the leaf",
-        "advice": "Keep plant in good condition"
-    },
-    "hi": {
-        "upload": "पत्ता अपलोड करें",
-        "scan": "स्कैन करें",
-        "diagnosis": "निदान",
-        "confidence": "विश्वास स्तर",
-        "healthy": "स्वस्थ पौधा",
-        "diseased_label": "रोगग्रस्त",
-        "disease_detected": "रोग पाया गया",
-        "click_upload": "अपलोड करने के लिए क्लिक करें",
-        "or_drag": "या ड्रैग और ड्रॉप करें",
-        "clear_photo": "पत्ते की साफ तस्वीर अपलोड करें",
-        "advice": "पौधे को अच्छी स्थिति में रखें"
-    }
+# =========================
+# SOLUTIONS
+# =========================
+solutions = {
+    "Healthy": "No treatment needed. Keep monitoring the plant.",
+    "Leaf spot": "Remove infected leaves and apply fungicide spray.",
+    "Powdery mildew": "Use sulfur spray and avoid overwatering.",
+    "Rust": "Apply neem oil or copper-based fungicide.",
+    "Blight": "Remove affected parts and use proper pesticides."
 }
 
-
-# 🔥 Prediction function
+# =========================
+# PREDICTION FUNCTION
+# =========================
 def predict_image(img):
     img = img.resize((224, 224))
     img_array = np.array(img) / 255.0
@@ -70,86 +131,101 @@ def predict_image(img):
 
     return classes[class_index], confidence
 
-
-# 🟢 MAIN ROUTE
+# =========================
+# MAIN ROUTE
+# =========================
 @app.route('/', methods=['GET', 'POST'])
+@login_required
 def index():
-    lang = request.args.get("lang", "en")
-    t = translations.get(lang, translations["en"])
-
-    result = ""
-    confidence = 0
-    suggestion = ""
-
-    if request.method == 'POST':
-        if 'image' not in request.files:
-            return render_template('index.html', predictions=[], t=t, lang=lang)
-
-        file = request.files['image']
-        img = Image.open(file).convert('RGB')
-
-        result, confidence = predict_image(img)
-
-        # ✅ FIXED (no hardcoding)
-        if "healthy" in result.lower():
-            suggestion = t["healthy"]
-        else:
-            suggestion = t["disease_detected"]
 
     prediction_data = []
 
-    if result:
+    if request.method == 'POST' and 'image' in request.files:
+
+        file = request.files['image']
+
+        if not os.path.exists(app.config['UPLOAD_FOLDER']):
+            os.makedirs(app.config['UPLOAD_FOLDER'])
+
+        filename = file.filename
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        file.save(filepath)
+
+        img = Image.open(filepath).convert('RGB')
+        result, confidence = predict_image(img)
+
+        # clean label
         clean_label = result.split("_", 1)[-1]
         clean_label = clean_label.replace("_", " ").capitalize()
 
+        solution = solutions.get(clean_label, "Consult expert")
+
+        # SAVE TO DATABASE ✅
+        new_prediction = Prediction(
+            user_id=current_user.id,
+            label=clean_label,
+            confidence=confidence,
+            image=filename
+        )
+
+        db.session.add(new_prediction)
+        db.session.commit()
+
+        # SEND TO FRONTEND ✅
         prediction_data = [{
             "label": clean_label,
             "confidence": confidence,
-            "severity": "None" if "healthy" in result.lower() else "Moderate",
-            "action": suggestion,
-            "prevention": t["advice"],   # ✅ FIX HERE
-            "color": "#2d6a35" if "healthy" in result.lower() else "#c0392b",
-            "low_conf": confidence < 50
+            "image": filename,
+            "solution": solution
         }]
 
-    return render_template(
-        'index.html',
-        predictions=prediction_data,
-        t=t,
-        lang=lang
-    )
+    return render_template("index.html", predictions=prediction_data)
 
+# =========================
+# HISTORY
+# =========================
+@app.route('/history')
+@login_required
+def history():
+    data = Prediction.query.filter_by(user_id=current_user.id).all()
+    return render_template("history.html", history=data)
 
-# 🔥 API ROUTE
-@app.route('/predict', methods=['POST'])
-def predict():
-    lang = request.args.get("lang", "en")
-    t = translations.get(lang, translations["en"])
+# =========================
+# PDF DOWNLOAD
+# =========================
+@app.route('/download_pdf')
+@login_required
+def download_pdf():
+    data = Prediction.query.filter_by(user_id=current_user.id).all()
 
-    if 'image' not in request.files:
-        return jsonify({"error": "No file uploaded"})
+    pdf_path = "static/history.pdf"
 
-    file = request.files['image']
-    img = Image.open(file).convert('RGB')
+    doc = SimpleDocTemplate(pdf_path)
+    styles = getSampleStyleSheet()
+    content = []
 
-    result, confidence = predict_image(img)
+    content.append(Paragraph("PlantGuard - Prediction History", styles['Title']))
+    content.append(Spacer(1, 20))
 
-    clean_label = result.split("_", 1)[-1]
-    clean_label = clean_label.replace("_", " ").capitalize()
+    for item in data:
+        content.append(Paragraph(f"Disease: {item.label}", styles['Normal']))
+        content.append(Paragraph(f"Confidence: {item.confidence}%", styles['Normal']))
 
-    if "healthy" in result.lower():
-        suggestion = t["healthy"]
-    else:
-        suggestion = t["disease_detected"]
+        img_path = os.path.join("static/uploads", item.image)
+        if os.path.exists(img_path):
+            content.append(RLImage(img_path, width=200, height=150))
 
-    return jsonify({
-        "result": clean_label,
-        "confidence": confidence,
-        "suggestion": suggestion,
-        "prevention": t["advice"]   # ✅ FIX HERE ALSO
-    })
+        content.append(Spacer(1, 20))
 
+    doc.build(content)
 
-# 🚀 RUN
+    return redirect("/static/history.pdf")
+
+# =========================
+# RUN
+# =========================
 if __name__ == "__main__":
+    with app.app_context():
+        db.create_all()
+
     app.run(debug=True)
